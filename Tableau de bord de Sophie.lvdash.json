@@ -1,0 +1,399 @@
+{
+  "datasets": [
+    {
+      "name": "kpi",
+      "displayName": "Indicateurs du dernier mois",
+      "queryLines": [
+        "WITH p AS (SELECT MAX(d.date) AS fin FROM workspace.gold.fait_ventes f JOIN workspace.gold.dim_date d ON d.cle_date = f.cle_date), m AS (SELECT d.nom_mois, mg.canal, SUM(f.montant) AS ca, COUNT(*) AS nb FROM workspace.gold.fait_ventes f JOIN workspace.gold.dim_date d ON d.cle_date = f.cle_date JOIN workspace.gold.dim_magasin mg ON mg.id_magasin = f.id_magasin GROUP BY d.nom_mois, mg.canal), t AS (SELECT nom_mois, SUM(ca) AS ca, SUM(nb) AS nb, SUM(CASE WHEN canal = 'WEB' THEN ca ELSE 0 END) AS ca_web FROM m GROUP BY nom_mois) SELECT a.nom_mois AS mois, ROUND(a.ca, 0) AS ca_mois, ROUND(b.ca, 0) AS ca_n1, ROUND((a.ca - b.ca) * 100 / b.ca, 1) AS evolution_pct, ROUND(a.ca / a.nb, 2) AS panier_moyen, ROUND(a.ca_web * 100 / a.ca, 1) AS part_web_pct FROM t a CROSS JOIN p JOIN t b ON b.nom_mois = date_format(add_months(p.fin, -12), 'yyyy-MM') WHERE a.nom_mois = date_format(p.fin, 'yyyy-MM')"
+      ]
+    },
+    {
+      "name": "mensuel",
+      "displayName": "CA mensuel par année",
+      "queryLines": [
+        "SELECT CAST(d.annee AS STRING) AS annee, d.mois, ROUND(SUM(f.montant), 0) AS ca FROM workspace.gold.fait_ventes f JOIN workspace.gold.dim_date d ON d.cle_date = f.cle_date GROUP BY d.annee, d.mois"
+      ]
+    },
+    {
+      "name": "region",
+      "displayName": "CA par région (12 derniers mois)",
+      "queryLines": [
+        "SELECT m.region, ROUND(SUM(f.montant), 0) AS ca FROM workspace.gold.fait_ventes f JOIN workspace.gold.dim_date d ON d.cle_date = f.cle_date JOIN workspace.gold.dim_magasin m ON m.id_magasin = f.id_magasin WHERE d.date > add_months((SELECT MAX(d2.date) FROM workspace.gold.dim_date d2), -12) GROUP BY m.region"
+      ]
+    },
+    {
+      "name": "magasin",
+      "displayName": "Évolution par magasin (dernier mois)",
+      "queryLines": [
+        "WITH c AS (SELECT m.nom AS magasin, d.nom_mois, SUM(f.montant) AS ca FROM workspace.gold.fait_ventes f JOIN workspace.gold.dim_date d ON d.cle_date = f.cle_date JOIN workspace.gold.dim_magasin m ON m.id_magasin = f.id_magasin GROUP BY m.nom, d.nom_mois), p AS (SELECT MAX(date) AS fin FROM workspace.gold.dim_date) SELECT a.magasin, ROUND((a.ca - b.ca) * 100 / b.ca, 1) AS evolution_pct, ROUND(a.ca, 0) AS ca_mois FROM c a CROSS JOIN p JOIN c b ON b.magasin = a.magasin AND b.nom_mois = date_format(add_months(p.fin, -12), 'yyyy-MM') WHERE a.nom_mois = date_format(p.fin, 'yyyy-MM')"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "lundi",
+      "displayName": "Le lundi de Sophie",
+      "layout": [
+        {
+          "widget": {
+            "name": "titre",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "# Le lundi de Sophie · UrbanMarket\n",
+                    "\n",
+                    "Dernier mois complet, comparé au même mois de l'année précédente. Source : couche gold (TP 3)."
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "k1",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi",
+                  "fields": [
+                    {
+                      "name": "sum_ca_mois",
+                      "expression": "SUM(`ca_mois`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum_ca_mois",
+                  "displayName": "CA du mois (€)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "CA du dernier mois (€)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "k2",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi",
+                  "fields": [
+                    {
+                      "name": "sum_evolution_pct",
+                      "expression": "SUM(`evolution_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum_evolution_pct",
+                  "displayName": "Évolution sur un an (%)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Évolution sur un an (%)"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "k3",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi",
+                  "fields": [
+                    {
+                      "name": "sum_panier_moyen",
+                      "expression": "SUM(`panier_moyen`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum_panier_moyen",
+                  "displayName": "Panier moyen (€)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Panier moyen (€)"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "courbe",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "mensuel",
+                  "fields": [
+                    {
+                      "name": "mois",
+                      "expression": "`mois`"
+                    },
+                    {
+                      "name": "annee",
+                      "expression": "`annee`"
+                    },
+                    {
+                      "name": "sum_ca",
+                      "expression": "SUM(`ca`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "mois",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Mois"
+                },
+                "y": {
+                  "fieldName": "sum_ca",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "CA (€)"
+                },
+                "color": {
+                  "fieldName": "annee",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Année"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "CA par mois : chaque année comparée à la précédente"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "regions",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "region",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "sum_ca",
+                      "expression": "SUM(`ca`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "region",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Région"
+                },
+                "y": {
+                  "fieldName": "sum_ca",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "CA (€)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "CA par région (12 derniers mois)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 3,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "magasins",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "magasin",
+                  "fields": [
+                    {
+                      "name": "magasin",
+                      "expression": "`magasin`"
+                    },
+                    {
+                      "name": "sum_evolution_pct",
+                      "expression": "SUM(`evolution_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "magasin",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Magasin"
+                },
+                "y": {
+                  "fieldName": "sum_evolution_pct",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Évolution (%)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Évolution sur un an par magasin (dernier mois, %)"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 11,
+            "width": 3,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "k4",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "kpi",
+                  "fields": [
+                    {
+                      "name": "sum_part_web_pct",
+                      "expression": "SUM(`part_web_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum_part_web_pct",
+                  "displayName": "Part du web (%)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Part du web dans le CA du mois (%)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 18,
+            "width": 2,
+            "height": 3
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    }
+  ]
+}
